@@ -2,7 +2,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, orientation=landscape" />
-    <title>Trening akordów — poprawiona wersja</title>
+    <title>Trening akordów</title>
     <style>
       :root {
         --white-w: 42px;
@@ -17,7 +17,15 @@
         font-family: Arial, Helvetica, sans-serif;
         margin: 0;
         text-align: center;
+        background-color: #fff;
+        color: #000;
       }
+
+      body.dark-mode {
+        background-color: #121212;
+        color: #e0e0e0;
+      }
+
       header {
         padding: 12px;
       }
@@ -34,6 +42,13 @@
         background: #fafafa;
         cursor: pointer;
       }
+
+      button.dark-mode {
+        border: 1px solid #444;
+        background: #333;
+        color: #e0e0e0;
+      }
+
       #pianoWrap {
         overflow: auto;
         padding: 12px;
@@ -58,6 +73,11 @@
         position: relative;
         cursor: pointer;
       }
+
+      .white.dark-mode {
+        background: #bbb;
+      }
+
       .black {
         width: var(--black-w);
         height: var(--black-h);
@@ -69,6 +89,11 @@
         border-radius: 0 0 4px 4px;
         cursor: pointer;
       }
+
+      .black.dark-mode {
+        background: #444;
+      }
+
       .pressed-correct-white {
         background: #00cc00 !important;
         border: 1px solid #000 !important;
@@ -83,11 +108,7 @@
       }
       #chordName {
         font-size: 22px;
-        margin: 6px 0;
-      }
-      #message {
-        min-height: 22px;
-        margin-top: 6px;
+        margin: 12px 0 0;
       }
       @media (max-width: 900px) {
         :root {
@@ -105,17 +126,19 @@
           --black-h: 86px;
         }
       }
+      #pianoWrap button {
+        margin-top: 16px;
+      }
     </style>
   </head>
   <body>
     <header>
-      <h1>Trening akordów</h1>
+      <h2>Trening akordów</h2>
       <div id="controls">
         <button id="btnNew">Losuj akord</button>
         <button id="btnClear">Wyczyść</button>
       </div>
       <div id="chordName">—</div>
-      <div id="message"></div>
     </header>
     <div id="pianoWrap">
       <div id="piano"></div>
@@ -400,7 +423,6 @@
             "pressed-wrong"
           )
         );
-        document.getElementById("message").textContent = "";
       }
 
       function newChord() {
@@ -409,7 +431,6 @@
         currentChordNotes = new Set(CHORDS[currentChordName]);
         pressed.clear();
         document.getElementById("chordName").textContent = currentChordName;
-        document.getElementById("message").textContent = "";
         document.querySelectorAll(
           ".white,.black"
         ).forEach((k) =>
@@ -421,6 +442,20 @@
         );
         console.log("Nowy akord", currentChordName, Array.from(currentChordNotes));
       }
+
+      function toggleDarkMode() {
+        const body = document.body;
+        body.classList.toggle('dark-mode');
+        document.querySelectorAll('button').forEach(button => button.classList.toggle('dark-mode'));
+        document.querySelectorAll('.white').forEach(key => key.classList.toggle('dark-mode'));
+        document.querySelectorAll('.black').forEach(key => key.classList.toggle('dark-mode'));
+      }
+
+      const darkModeButton = document.createElement('button');
+      darkModeButton.textContent = 'Dark Mode';
+      darkModeButton.addEventListener('click', toggleDarkMode);
+      const pianoWrap = document.getElementById('pianoWrap');
+      pianoWrap.appendChild(darkModeButton);
 
       buildKeyboard(3);
       document.getElementById("btnNew").addEventListener("click", newChord);
