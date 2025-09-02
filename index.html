@@ -1,398 +1,434 @@
 <html lang="pl">
-  
-<head>
-  
-  <meta charset="utf-8" />
-  
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  
-  <title>Trening akordów — poprawiona wersja</title>
-  
-  <style>
-  
-    :root{ --white-w:42px; --white-h:180px; --black-w:28px; --black-h:110px; }
-  
-    *{box-sizing:border-box}
-  
-    body{font-family:Arial,Helvetica,sans-serif;margin:0;text-align:center}
-  
-    header{padding:12px}
-  
-    #controls{display:flex;gap:8px;justify-content:center;margin-bottom:8px}
-  
-    button{padding:8px 12px;border-radius:8px;border:1px solid #ccc;background:#fafafa;cursor:pointer}
-  
-
-  
-    #pianoWrap{overflow:auto;padding:12px}
-  
-    #piano{display:flex;gap:0;align-items:flex-start;width:max-content;margin:0 auto;user-select:none}
-  
-    .octave{display:flex;position:relative}
-  
-
-  
-    .white{width:var(--white-w);height:var(--white-h);border:1px solid #000;background:#fff;position:relative;cursor:pointer}
-  
-    .black{width:var(--black-w);height:var(--black-h);background:#000;position:absolute;top:0;left:calc(var(--white-w) - var(--black-w)/2);z-index:3;border-radius:0 0 4px 4px;cursor:pointer}
-  
-
-  
-    /* kolory trafienia */
-  
-    .pressed-correct-white{background:#00cc00 !important}
-  
-    .pressed-correct-black{background:#66ff66 !important}
-  
-    .pressed-wrong{background:#f44336 !important}
-  
-
-  
-    #chordName{font-size:22px;margin:6px 0}
-  
-    #message{min-height:22px;margin-top:6px}
-  
-
-  
-    @media(max-width:900px){:root{--white-w:36px;--white-h:150px;--black-w:24px;--black-h:92px}}
-  
-    @media(max-width:700px){:root{--white-w:30px;--white-h:140px;--black-w:20px;--black-h:86px}}
-  
-  </style>
-  
-</head>
-  
-<body>
-  
-  <header>
-  
-    <h1>Trening akordów</h1>
-  
-    <div id="controls">
-  
-      <button id="btnNew">Losuj akord</button>
-  
-      <button id="btnClear">Wyczyść</button>
-  
-    </div>
-  
-    <div id="chordName">—</div>
-  
-    <div id="message"></div>
-  
-  </header>
-  
-
-  
-  <div id="pianoWrap"><div id="piano"></div></div>
-  
-
-  
-  <script>
-  
-    // --- dane ---
-  
-    const NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
-  
-    const ROOTS = ["C","D","E","F","G","A","B"]; // podstawy
-  
-const ENHARMONIC_ALIASES = {
-  "Db": "C#",
-  "Eb": "D#",
-  "Gb": "F#",
-  "Ab": "G#",
-  "Bb": "A#"
-};
-  
-    // gotowe akordy (durowe, molowe, 7, 6, dim + mol6 i mol7)
-  
-    const CHORDS = {
-  // Akordy z białych klawiszy
-  "C": ["C","E","G"], "Cm": ["C","D#","G"], "C7": ["C","E","G","A#"], "C6": ["C","E","G","A"], "Cm6": ["C","D#","G","A"], "Cm7": ["C","D#","G","A#"],
-  "D": ["D","F#","A"], "Dm": ["D","F","A"], "D7": ["D","F#","A","C"], "D6": ["D","F#","A","B"], "Dm6": ["D","F","A","B"], "Dm7": ["D","F","A","C"],
-  "E": ["E","G#","B"], "Em": ["E","G","B"], "E7": ["E","G#","B","D"], "E6": ["E","G#","B","C#"], "Em6": ["E","G","B","C#"], "Em7": ["E","G","B","D"],
-  "F": ["F","A","C"], "Fm": ["F","G#","C"], "F7": ["F","A","C","D#"], "F6": ["F","A","C","D"], "Fm6": ["F","G#","C","D"], "Fm7": ["F","G#","C","D#"],
-  "G": ["G","B","D"], "Gm": ["G","A#","D"], "G7": ["G","B","D","F"], "G6": ["G","B","D","E"], "Gm6": ["G","A#","D","E"], "Gm7": ["G","A#","D","F"],
-  "A": ["A","C#","E"], "Am": ["A","C","E"], "A7": ["A","C#","E","G"], "A6": ["A","C#","E","F#"], "Am6": ["A","C","E","F#"], "Am7": ["A","C","E","G"],
-  "B": ["B","D#","F#"], "Bm": ["B","D","F#"], "B7": ["B","D#","F#","A"], "B6": ["B","D#","F#","G#"], "Bm6": ["B","D","F#","G#"], "Bm7": ["B","D","F#","A"],
-
-  // Akordy z czarnych klawiszy
-  "C#": ["C#","F","G#"], "C#m": ["C#","E","G#"], "C#7": ["C#","F","G#","B"], "C#6": ["C#","F","G#","A#"], "C#m6": ["C#","E","G#","A#"], "C#m7": ["C#","E","G#","B"],
-  "D#": ["D#","G","A#"], "D#m": ["D#","F#","A#"], "D#7": ["D#","G","A#","C#"], "D#6": ["D#","G","A#","C"], "D#m6": ["D#","F#","A#","C"], "D#m7": ["D#","F#","A#","C#"],
-  "F#": ["F#","A#","C#"], "F#m": ["F#","A","C#"], "F#7": ["F#","A#","C#","E"], "F#6": ["F#","A#","C#","D#"], "F#m6": ["F#","A","C#","D#"], "F#m7": ["F#","A","C#","E"],
-  "G#": ["G#","C","D#"], "G#m": ["G#","B","D#"], "G#7": ["G#","C","D#","F#"], "G#6": ["G#","C","D#","F"], "G#m6": ["G#","B","D#","F"], "G#m7": ["G#","B","D#","F#"],
-  "A#": ["A#","D","F"], "A#m": ["A#","C#","F"], "A#7": ["A#","D","F","G#"], "A#6": ["A#","D","F","G"], "A#m6": ["A#","C#","F","G"], "A#m7": ["A#","C#","F","G#"],
-  
-  // AUGMENTED (zwiększone)
-  "Caug": ["C", "E", "G#"], "Daug": ["D", "F#", "A#"], "Eaug": ["E", "G#", "C"], "Faug": ["F", "A", "C#"],
-  "Gaug": ["G", "B", "D#"], "Aaug": ["A", "C#", "F"], "Baug": ["B", "D#", "G"],
-
-  // DIMINISHED 7 (zmniejszone septymowe)
-  "Cdim7": ["C", "D#", "F#", "A"], "Ddim7": ["D", "F", "G#", "B"], "Edim7": ["E", "G", "A#", "C#"],
-  "Fdim7": ["F", "G#", "B", "D"], "Gdim7": ["G", "A#", "C#", "E"], "Adim7": ["A", "C", "D#", "F#"],
-  "Bdim7": ["B", "D", "F", "G#"],
-
-  // SUSPENDED (sus2 / sus4)
-  "Csus2": ["C", "D", "G"], "Csus4": ["C", "F", "G"], "Dsus2": ["D", "E", "A"], "Dsus4": ["D", "G", "A"],
-  "Esus2": ["E", "F#", "B"], "Esus4": ["E", "A", "B"], "Fsus2": ["F", "G", "C"], "Fsus4": ["F", "A#", "C"],
-  "Gsus2": ["G", "A", "D"], "Gsus4": ["G", "C", "D"], "Asus2": ["A", "B", "E"], "Asus4": ["A", "D", "E"],
-  "Bsus2": ["B", "C#", "F#"], "Bsus4": ["B", "E", "F#"],
-
-  // ADD CHORDS (add9 / add11)
-  "Cadd9": ["C", "E", "G", "D"], "Dadd9": ["D", "F#", "A", "E"], "Eadd9": ["E", "G#", "B", "F#"],
-  "Fadd9": ["F", "A", "C", "G"], "Gadd9": ["G", "B", "D", "A"], "Aadd9": ["A", "C#", "E", "B"],
-  "Badd9": ["B", "D#", "F#", "C#"],
-
-  "Cadd11": ["C", "E", "G", "F"], "Dadd11": ["D", "F#", "A", "G"], "Eadd11": ["E", "G#", "B", "A"],
-  "Fadd11": ["F", "A", "C", "A#"], "Gadd11": ["G", "B", "D", "C"], "Aadd11": ["A", "C#", "E", "D"],
-  "Badd11": ["B", "D#", "F#", "E"],
-
-  // MAJOR 7 (maj7)
-  "Cmaj7": ["C", "E", "G", "B"], "Dmaj7": ["D", "F#", "A", "C#"], "Emaj7": ["E", "G#", "B", "D#"],
-  "Fmaj7": ["F", "A", "C", "E"], "Gmaj7": ["G", "B", "D", "F#"], "Amaj7": ["A", "C#", "E", "G#"],
-  "Bmaj7": ["B", "D#", "F#", "A#"],
-
-  // DOMINANT 9 (9)
-  "C9": ["C", "E", "G", "A#", "D"], "D9": ["D", "F#", "A", "C", "E"], "E9": ["E", "G#", "B", "D", "F#"],
-  "F9": ["F", "A", "C", "D#", "G"], "G9": ["G", "B", "D", "F", "A"], "A9": ["A", "C#", "E", "G", "B"],
-  "B9": ["B", "D#", "F#", "A", "C#"],
-
-  // MINOR 9 (m9)
-  "Cm9": ["C", "D#", "G", "A#", "D"], "Dm9": ["D", "F", "A", "C", "E"], "Em9": ["E", "G", "B", "D", "F#"],
-  "Fm9": ["F", "G#", "C", "D#", "G"], "Gm9": ["G", "A#", "D", "F", "A"], "Am9": ["A", "C", "E", "G", "B"],
-  "Bm9": ["B", "D", "F#", "A", "C#"]
-};
-
-// Dodaj aliasy enharmoniczne do CHORDS
-for (const [alias, original] of Object.entries(ENHARMONIC_ALIASES)) {
-  for (const suffix of ["", "m", "7", "6", "m6", "m7", "aug", "dim7", "sus2", "sus4", "add9", "add11", "maj7", "9", "m9"]) {
-    const origName = original + suffix;
-    const aliasName = alias + suffix;
-    if (CHORDS[origName]) {
-      CHORDS[aliasName] = CHORDS[origName];
-    }
-  }
-}
-  
-
-  
-    let currentChordName = null;
-  
-    let currentChordNotes = new Set();
-  
-    let pressed = new Set();
-  
-
-  
-    // --- budowa klawiatury ---
-  
-    const WHITE_ORDER = ["C","D","E","F","G","A","B"];
-  
-    const HAS_SHARP_AFTER = { C:true, D:true, E:false, F:true, G:true, A:true, B:false };
-  
-
-  
-    function makeOctave(oct){
-  
-      const octDiv = document.createElement('div');
-  
-      octDiv.className = 'octave';
-  
-
-  
-      WHITE_ORDER.forEach(w => {
-  
-        const wKey = document.createElement('div');
-  
-        wKey.className = 'white';
-  
-        wKey.dataset.note = w + oct; // pełna (np. C4)
-  
-        wKey.dataset.base = w;       // baza nuty bez oktawy
-  
-        wKey.addEventListener('click', () => onKeyClick(wKey));
-  
-        octDiv.appendChild(wKey);
-  
-
-  
-        if (HAS_SHARP_AFTER[w]){
-  
-          const sharp = NOTES[(NOTES.indexOf(w) + 1) % NOTES.length];
-  
-          const bKey = document.createElement('div');
-  
-          bKey.className = 'black';
-  
-          bKey.dataset.note = sharp + oct;
-  
-          bKey.dataset.base = sharp;
-  
-          // bardzo ważne: zatrzymujemy propagację, żeby nie aktywować białego pod spodem
-  
-          bKey.addEventListener('click', (e) => { e.stopPropagation(); onKeyClick(bKey); });
-  
-          wKey.appendChild(bKey);
-  
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Trening akordów — poprawiona wersja</title>
+    <style>
+      :root {
+        --white-w: 42px;
+        --white-h: 180px;
+        --black-w: 28px;
+        --black-h: 110px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: Arial, Helvetica, sans-serif;
+        margin: 0;
+        text-align: center;
+      }
+      header {
+        padding: 12px;
+      }
+      #controls {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        margin-bottom: 8px;
+      }
+      button {
+        padding: 8px 12px;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+        background: #fafafa;
+        cursor: pointer;
+      }
+      #pianoWrap {
+        overflow: auto;
+        padding: 12px;
+      }
+      #piano {
+        display: flex;
+        gap: 0;
+        align-items: flex-start;
+        width: max-content;
+        margin: 0 auto;
+        user-select: none;
+      }
+      .octave {
+        display: flex;
+        position: relative;
+      }
+      .white {
+        width: var(--white-w);
+        height: var(--white-h);
+        border: 1px solid #000;
+        background: #fff;
+        position: relative;
+        cursor: pointer;
+      }
+      .black {
+        width: var(--black-w);
+        height: var(--black-h);
+        background: #000;
+        position: absolute;
+        top: 0;
+        left: calc(var(--white-w) - var(--black-w) / 2);
+        z-index: 3;
+        border-radius: 0 0 4px 4px;
+        cursor: pointer;
+      }
+      .pressed-correct-white {
+        background: #00cc00 !important;
+        border: 1px solid #000 !important;
+      }
+      .pressed-correct-black {
+        background: #66ff66 !important;
+        border: 1px solid #000 !important;
+      }
+      .pressed-wrong {
+        background: #f44336 !important;
+        border: 1px solid #000 !important;
+      }
+      #chordName {
+        font-size: 22px;
+        margin: 6px 0;
+      }
+      #message {
+        min-height: 22px;
+        margin-top: 6px;
+      }
+      @media (max-width: 900px) {
+        :root {
+          --white-w: 36px;
+          --white-h: 150px;
+          --black-w: 24px;
+          --black-h: 92px;
         }
-  
-      });
-  
-
-  
-      return octDiv;
-  
-    }
-  
-
-  
-    function buildKeyboard(octavesCount=3){
-  
-      const piano = document.getElementById('piano');
-  
-      piano.innerHTML = '';
-  
-      const startOct = 3;
-  
-      for (let o=0;o<octavesCount;o++){
-  
-        piano.appendChild(makeOctave(startOct + o));
-  
       }
-  
-    }
-  
+      @media (max-width: 700px) {
+        :root {
+          --white-w: 30px;
+          --white-h: 140px;
+          --black-w: 20px;
+          --black-h: 86px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Trening akordów</h1>
+      <div id="controls">
+        <button id="btnNew">Losuj akord</button>
+        <button id="btnClear">Wyczyść</button>
+      </div>
+      <div id="chordName">—</div>
+      <div id="message"></div>
+    </header>
+    <div id="pianoWrap">
+      <div id="piano"></div>
+    </div>
+    <script>
+      const NOTES = [
+        "C",
+        "C#",
+        "D",
+        "D#",
+        "E",
+        "F",
+        "F#",
+        "G",
+        "G#",
+        "A",
+        "A#",
+        "B",
+      ];
+      const ROOTS = ["C", "D", "E", "F", "G", "A", "B"];
+      const ENHARMONIC_ALIASES = {
+        Db: "C#",
+        Eb: "D#",
+        Gb: "F#",
+        Ab: "G#",
+        Bb: "A#",
+      };
+      const CHORDS = {
+        C: ["C", "E", "G"],
+        Cm: ["C", "D#", "G"],
+        C7: ["C", "E", "G", "A#"],
+        C6: ["C", "E", "G", "A"],
+        Cm6: ["C", "D#", "G", "A"],
+        Cm7: ["C", "D#", "G", "A#"],
+        D: ["D", "F#", "A"],
+        Dm: ["D", "F", "A"],
+        D7: ["D", "F#", "A", "C"],
+        D6: ["D", "F#", "A", "B"],
+        Dm6: ["D", "F", "A", "B"],
+        Dm7: ["D", "F", "A", "C"],
+        E: ["E", "G#", "B"],
+        Em: ["E", "G", "B"],
+        E7: ["E", "G#", "B", "D"],
+        E6: ["E", "G#", "B", "C#"],
+        Em6: ["E", "G", "B", "C#"],
+        Em7: ["E", "G", "B", "D"],
+        F: ["F", "A", "C"],
+        Fm: ["F", "G#", "C"],
+        F7: ["F", "A", "C", "D#"],
+        F6: ["F", "A", "C", "D"],
+        Fm6: ["F", "G#", "C", "D"],
+        Fm7: ["F", "G#", "C", "D#"],
+        G: ["G", "B", "D"],
+        Gm: ["G", "A#", "D"],
+        G7: ["G", "B", "D", "F"],
+        G6: ["G", "B", "D", "E"],
+        Gm6: ["G", "A#", "D", "E"],
+        Gm7: ["G", "A#", "D", "F"],
+        A: ["A", "C#", "E"],
+        Am: ["A", "C", "E"],
+        A7: ["A", "C#", "E", "G"],
+        A6: ["A", "C#", "E", "F#"],
+        Am6: ["A", "C", "E", "F#"],
+        Am7: ["A", "C", "E", "G"],
+        B: ["B", "D#", "F#"],
+        Bm: ["B", "D", "F#"],
+        B7: ["B", "D#", "F#", "A"],
+        B6: ["B", "D#", "F#", "G#"],
+        Bm6: ["B", "D", "F#", "G#"],
+        Bm7: ["B", "D", "F#", "A"],
 
-  
-    // --- logika kliknięć ---
-  
-    function onKeyClick(el){
-  
-      const base = el.dataset.base; // np. 'C' albo 'C#'
-  
-      const octave = el.closest('.octave'); // znajdź oktawę klawisza
-  
-      const isAlready = pressed.has(base);
-  
+        "C#": ["C#", "F", "G#"],
+        "C#m": ["C#", "E", "G#"],
+        "C#7": ["C#", "F", "G#", "B"],
+        "C#6": ["C#", "F", "G#", "A#"],
+        "C#m6": ["C#", "E", "G#", "A#"],
+        "C#m7": ["C#", "E", "G#", "B"],
+        "D#": ["D#", "G", "A#"],
+        "D#m": ["D#", "F#","A#"],
+        "D#7": ["D#", "G", "A#", "C#"],
+        "D#6": ["D#", "G", "A#", "C"],
+        "D#m6": ["D#", "F#","A#","C"],
+        "D#m7": ["D#", "F#","A#","C#"],
+        "F#": ["F#", "A#", "C#"],
+        "F#m": ["F#", "A", "C#"],
+        "F#7": ["F#", "A#", "C#", "E"],
+        "F#6": ["F#", "A#", "C#", "D#"],
+        "F#m6": ["F#", "A", "C#", "D#"],
+        "F#m7": ["F#", "A", "C#", "E"],
+        "G#": ["G#", "C", "D#"],
+        "G#m": ["G#", "B", "D#"],
+        "G#7": ["G#", "C", "D#", "F#"],
+        "G#6": ["G#", "C", "D#", "F"],
+        "G#m6": ["G#", "B", "D#", "F"],
+        "G#m7": ["G#", "B", "D#", "F#"],
+        "A#": ["A#", "D", "F"],
+        "A#m": ["A#", "C#", "F"],
+        "A#7": ["A#", "D", "F", "G#"],
+        "A#6": ["A#", "D", "F", "G"],
+        "A#m6": ["A#", "C#", "F", "G"],
+        "A#m7": ["A#", "C#", "F", "G#"],
 
-  
-      if (isAlready){
-  
-        // odznaczamy nutę: usuwamy klasę ze wszystkich klawiszy tej nazwy w tej oktawie
-  
-        pressed.delete(base);
-  
-        octave.querySelectorAll(`[data-base="${base}"]`).forEach(k => k.classList.remove('pressed-correct-white','pressed-correct-black','pressed-wrong'));
-  
-      } else {
-  
-        pressed.add(base);
-  
-        const correct = currentChordNotes.has(base);
-  
-        // podświetlamy tylko klawisze w tej oktawie
-  
-        octave.querySelectorAll(`[data-base="${base}"]`).forEach(k => {
-  
-          if (correct){
-  
-            if (k.classList.contains('black')) k.classList.add('pressed-correct-black');
-  
-            else k.classList.add('pressed-correct-white');
-  
-          } else {
-  
-            k.classList.add('pressed-wrong');
-  
+        "Caug": ["C", "E", "G#"],
+        "Daug": ["D", "F#", "A#"],
+        "Eaug": ["E", "G#", "C"],
+        "Faug": ["F", "A", "C#"],
+        "Gaug": ["G", "B", "D#"],
+        "Aaug": ["A", "C#", "F"],
+        "Baug": ["B", "D#", "G"],
+
+        "Cdim7": ["C", "D#", "F#", "A"],
+        "Ddim7": ["D", "F", "G#", "B"],
+        "Edim7": ["E", "G", "A#", "C#"],
+        "Fdim7": ["F", "G#", "B", "D"],
+        "Gdim7": ["G", "A#", "C#", "E"],
+        "Adim7": ["A", "C", "D#", "F#"],
+        "Bdim7": ["B", "D", "F", "G#"],
+
+        "Csus2": ["C", "D", "G"],
+        "Csus4": ["C", "F", "G"],
+        "Dsus2": ["D", "E", "A"],
+        "Dsus4": ["D", "G", "A"],
+        "Esus2": ["E", "F#", "B"],
+        "Esus4": ["E", "A", "B"],
+        "Fsus2": ["F", "G", "C"],
+        "Fsus4": ["F", "A#", "C"],
+        "Gsus2": ["G", "A", "D"],
+        "Gsus4": ["G", "C", "D"],
+        "Asus2": ["A", "B", "E"],
+        "Asus4": ["A", "D", "E"],
+        "Bsus2": ["B", "C#", "F#"],
+        "Bsus4": ["B", "E", "F#"],
+
+        "Cadd9": ["C", "E", "G", "D"],
+        "Dadd9": ["D", "F#", "A", "E"],
+        "Eadd9": ["E", "G#", "B", "F#"],
+        "Fadd9": ["F", "A", "C", "G"],
+        "Gadd9": ["G", "B", "D", "A"],
+        "Aadd9": ["A", "C#", "E", "B"],
+        "Badd9": ["B", "D#", "F#", "C#"],
+
+        "Cadd11": ["C", "E", "G", "F"],
+        "Dadd11": ["D", "F#", "A", "G"],
+        "Eadd11": ["E", "G#", "B", "A"],
+        "Fadd11": ["F", "A", "C", "A#"],
+        "Gadd11": ["G", "B", "D", "C"],
+        "Aadd11": ["A", "C#", "E", "D"],
+        "Badd11": ["B", "D#", "F#", "E"],
+
+        "Cmaj7": ["C", "E", "G", "B"],
+        "Dmaj7": ["D", "F#", "A", "C#"],
+        "Emaj7": ["E", "G#", "B", "D#"],
+        "Fmaj7": ["F", "A", "C", "E"],
+        "Gmaj7": ["G", "B", "D", "F#"],
+        "Amaj7": ["A", "C#", "E", "G#"],
+        "Bmaj7": ["B", "D#", "F#", "A#"],
+
+        "C9": ["C", "E", "G", "A#", "D"],
+        "D9": ["D", "F#", "A", "C", "E"],
+        "E9": ["E", "G#", "B", "D", "F#"],
+        "F9": ["F", "A", "C", "D#", "G"],
+        "G9": ["G", "B", "D", "F", "A"],
+        "A9": ["A", "C#", "E", "G", "B"],
+        "B9": ["B", "D#", "F#", "A", "C#"],
+
+        "Cm9": ["C", "D#", "G", "A#", "D"],
+        "Dm9": ["D", "F", "A", "C", "E"],
+        "Em9": ["E", "G", "B", "D", "F#"],
+        "Fm9": ["F", "G#", "C", "D#", "G"],
+        "Gm9": ["G", "A#", "D", "F", "A"],
+        "Am9": ["A", "C", "E", "G", "B"],
+        "Bm9": ["B", "D", "F#", "A", "C#"],
+      };
+
+      for (const [alias, original] of Object.entries(ENHARMONIC_ALIASES)) {
+        for (const suffix of [
+          "",
+          "m",
+          "7",
+          "6",
+          "m6",
+          "m7",
+          "aug",
+          "dim7",
+          "sus2",
+          "sus4",
+          "add9",
+          "add11",
+          "maj7",
+          "9",
+          "m9",
+        ]) {
+          const origName = original + suffix;
+          const aliasName = alias + suffix;
+          if (CHORDS[origName]) {
+            CHORDS[aliasName] = CHORDS[origName];
           }
-  
-        });
-  
+        }
       }
-  
 
-  
-      checkAnswer();
-  
-    }
-  
+      let currentChordName = null;
+      let currentChordNotes = new Set();
+      let pressed = new Set();
 
-  
-    function clearSelection(){
-  
-      pressed.clear();
-  
-      document.querySelectorAll('.white,.black').forEach(k => k.classList.remove('pressed-correct-white','pressed-correct-black','pressed-wrong'));
-  
-      document.getElementById('message').textContent = '';
-  
-    }
-  
+      const WHITE_ORDER = ["C", "D", "E", "F", "G", "A", "B"];
+      const HAS_SHARP_AFTER = {
+        C: true,
+        D: true,
+        E: false,
+        F: true,
+        G: true,
+        A: true,
+        B: false,
+      };
 
-  
-    function newChord(){
-  
-      const names = Object.keys(CHORDS);
-  
-      currentChordName = names[Math.floor(Math.random()*names.length)];
-  
-      currentChordNotes = new Set(CHORDS[currentChordName]);
-  
-      pressed.clear();
-  
-      document.getElementById('chordName').textContent = currentChordName;
-  
-      document.getElementById('message').textContent = '';
-  
-      document.querySelectorAll('.white,.black').forEach(k => k.classList.remove('pressed-correct-white','pressed-correct-black','pressed-wrong'));
-  
-      // debug
-  
-      console.log('Nowy akord', currentChordName, Array.from(currentChordNotes));
-  
-    }
-  
+      function makeOctave(oct) {
+        const octDiv = document.createElement("div");
+        octDiv.className = "octave";
 
-  
-    function checkAnswer(){
-  
-     // if (!currentChordName)
-      return;
-  
-    //  const req = Array.from(currentChordNotes).sort();
-  
-      //const got = Array.from(pressed).sort();
-  
-      //if (JSON.stringify(req) === JSON.stringify(got)){
-  
-        //document.getElementById('message').textContent = '✅ Brawo! Znalazłeś akord ' + currentChordName;
-  
-    //  } else {
-  
-       // document.getElementById('message').textContent = '';
-  
-     // }
-  
-    }
-  
+        WHITE_ORDER.forEach((w) => {
+          const wKey = document.createElement("div");
+          wKey.className = "white";
+          wKey.dataset.note = w + oct;
+          wKey.dataset.base = w;
+          wKey.addEventListener("click", () => onKeyClick(wKey));
+          octDiv.appendChild(wKey);
 
-  
-    // --- init ---
-  
-    buildKeyboard(3);
-  
-    document.getElementById('btnNew').addEventListener('click', newChord);
-  
-    document.getElementById('btnClear').addEventListener('click', clearSelection);
-  
+          if (HAS_SHARP_AFTER[w]) {
+            const sharp = NOTES[(NOTES.indexOf(w) + 1) % NOTES.length];
+            const bKey = document.createElement("div");
+            bKey.className = "black";
+            bKey.dataset.note = sharp + oct;
+            bKey.dataset.base = sharp;
+            bKey.addEventListener("click", (e) => {
+              e.stopPropagation();
+              onKeyClick(bKey);
+            });
+            wKey.appendChild(bKey);
+          }
+        });
 
-  
-    // start
-  
-    window.addEventListener('load', () => { newChord(); });
-  
-  </script>
-  
-</body>
-  
+        return octDiv;
+      }
+
+      function buildKeyboard(octavesCount = 3) {
+        const piano = document.getElementById("piano");
+        piano.innerHTML = "";
+        const startOct = 3;
+        for (let o = 0; o < octavesCount; o++) {
+          piano.appendChild(makeOctave(startOct + o));
+        }
+      }
+
+      function onKeyClick(el) {
+        const base = el.dataset.base;
+        const octave = el.closest(".octave");
+        const isAlready = pressed.has(base);
+
+        pressed.add(base);
+        const correct = currentChordNotes.has(base);
+        octave.querySelectorAll(`[data-base="${base}"]`).forEach((k) => {
+          if (correct) {
+            if (k.classList.contains("black")) {
+              k.classList.add("pressed-correct-black");
+            } else {
+              k.classList.add("pressed-correct-white");
+            }
+          } else {
+            k.classList.add("pressed-wrong");
+          }
+        });
+      }
+
+      function clearSelection() {
+        pressed.clear();
+        document.querySelectorAll(
+          ".white,.black"
+        ).forEach((k) =>
+          k.classList.remove(
+            "pressed-correct-white",
+            "pressed-correct-black",
+            "pressed-wrong"
+          )
+        );
+        document.getElementById("message").textContent = "";
+      }
+
+      function newChord() {
+        const names = Object.keys(CHORDS);
+        currentChordName = names[Math.floor(Math.random() * names.length)];
+        currentChordNotes = new Set(CHORDS[currentChordName]);
+        pressed.clear();
+        document.getElementById("chordName").textContent = currentChordName;
+        document.getElementById("message").textContent = "";
+        document.querySelectorAll(
+          ".white,.black"
+        ).forEach((k) =>
+          k.classList.remove(
+            "pressed-correct-white",
+            "pressed-correct-black",
+            "pressed-wrong"
+          )
+        );
+        console.log("Nowy akord", currentChordName, Array.from(currentChordNotes));
+      }
+
+      buildKeyboard(3);
+      document.getElementById("btnNew").addEventListener("click", newChord);
+      document.getElementById("btnClear").addEventListener("click", clearSelection);
+
+      window.addEventListener("load", () => {
+        newChord();
+      });
+    </script>
+  </body>
 </html>
